@@ -1,5 +1,5 @@
 
-module multiply_add_accumulator_ (
+module multiply_add_accumulator (
     input clk,
     input reset,
     input enable,
@@ -23,7 +23,7 @@ endmodule
 
 
 // info how to setup SB_MAC16: https://trmm.net/Multiplier/
-module multiply_add_accumulator (
+module multiply_add_accumulator_ (
     input clk,
     input reset,
     input enable,
@@ -148,7 +148,7 @@ endmodule
 module mac_grid(
     input clk,
     input reset,
-    output [31:0] out,
+    output reg [31:0] out,
     output [15:0] progress
 );
 
@@ -159,91 +159,63 @@ module mac_grid(
         $readmemh("activations.memh", activations_memory);
     end
 
-    reg [15:0] mac_a_1;
-    reg [15:0] mac_b_1;
-    reg [15:0] mac_a_2;
-    reg [15:0] mac_b_2;
-    reg [15:0] mac_a_3;
-    reg [15:0] mac_b_3;
-    reg [15:0] mac_a_4;
-    reg [15:0] mac_b_4;
-    wire [31:0] out_1;
-    wire [31:0] out_2;
-    wire [31:0] out_3;
-    wire [31:0] out_4;
-    assign out = out_1 + out_2 + out_3 + out_4;
-    multiply_add_accumulator mac_1(
-        .clk(clk),
-        .reset(reset),
-        .enable(1'b1),
-        .a(mac_a_1),
-        .b(mac_b_1),
-        .out(out_1)
-    );
+    localparam MAC_COUNT = 32;
 
-    multiply_add_accumulator mac_2(
-        .clk(clk),
-        .reset(reset),
-        .enable(1'b1),
-        .a(mac_a_2),
-        .b(mac_b_2),
-        .out(out_2)
-    );
+    reg [15:0] mac_a[MAC_COUNT-1:0];
+    reg [15:0] mac_b[MAC_COUNT-1:0];
+    reg [31:0] mac_out[MAC_COUNT-1:0];
 
-    multiply_add_accumulator mac_3(
-        .clk(clk),
-        .reset(reset),
-        .enable(1'b1),
-        .a(mac_a_3),
-        .b(mac_b_3),
-        .out(out_3)
-    );
+    genvar i;
+    generate
+        for (i = 0; i < MAC_COUNT; i = i + 1) begin : element
+            multiply_add_accumulator mac(
+                .clk(clk),
+                .reset(reset),
+                .enable(1'b1),
+                .a(mac_a[i]),
+                .b(mac_b[i]),
+                .out(mac_out[i])
+            );
+        end
+    endgenerate
 
-    multiply_add_accumulator mac_4(
-        .clk(clk),
-        .reset(reset),
-        .enable(1'b1),
-        .a(mac_a_4),
-        .b(mac_b_4),
-        .out(out_4)
-    );
+    if (MAC_COUNT == 4)
+        assign out = mac_out[0] + mac_out[1] + mac_out[2] + mac_out[3];
+    else if (MAC_COUNT == 8)
+        assign out = mac_out[0] + mac_out[1] + mac_out[2] + mac_out[3] + mac_out[4] + mac_out[5] + mac_out[6] + mac_out[7];
+    else begin
+        integer nn;
+        always @ (*)
+        begin
+            out = 0;
+            for(nn = 0; nn < MAC_COUNT; nn = nn + 1)
+                out = out + mac_out[nn];
+        end
+    end
 
+    reg [7:0] n;
     reg [63:0] time_counter = 0;
     reg [15:0] counter = 0;
     always @(posedge clk) begin
         if (reset) begin
             counter <= 0;
-            mac_a_1 <= 0;
-            mac_b_1 <= 0;
-            mac_a_2 <= 0;
-            mac_b_2 <= 0;
-            mac_a_3 <= 0;
-            mac_b_3 <= 0;
-            mac_a_4 <= 0;
-            mac_b_4 <= 0;
-        end else if (counter < 256/4) begin //  && time_counter == 12_000_000/30) begin
+            for (n = 0; n < MAC_COUNT; n = n + 1) begin
+                mac_a[n] <= 0;
+                mac_b[n] <= 0;
+            end
+        end else if (counter < 256) begin //  && time_counter == 12_000_000/30) begin
             time_counter <= 0;
-            counter <= counter + 1;
+            counter <= counter + MAC_COUNT;
 
-            mac_a_1 <= weights_memory[counter*4+0];
-            mac_b_1 <= activations_memory[counter*4+0];
-            mac_a_2 <= weights_memory[counter*4+1];
-            mac_b_2 <= activations_memory[counter*4+1];
-            mac_a_3 <= weights_memory[counter*4+2];
-            mac_b_3 <= activations_memory[counter*4+2];
-            mac_a_4 <= weights_memory[counter*4+3];
-            mac_b_4 <= activations_memory[counter*4+3];
-
+            for (n = 0; n < MAC_COUNT; n = n + 1) begin
+                mac_a[n] <= weights_memory[counter + n];
+                mac_b[n] <= activations_memory[counter + n];
+            end
         end else begin
-            time_counter <= time_counter + 1;
-            mac_a_1 <= 0;
-            mac_b_1 <= 0;
-            mac_a_2 <= 0;
-            mac_b_2 <= 0;
-            mac_a_3 <= 0;
-            mac_b_3 <= 0;
-            mac_a_4 <= 0;
-            mac_b_4 <= 0;
+            for (n = 0; n < MAC_COUNT; n = n + 1) begin
+                mac_a[n] <= 0;
+                mac_b[n] <= 0;
+            end        
         end
     end
 
