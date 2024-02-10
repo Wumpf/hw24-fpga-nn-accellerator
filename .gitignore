@@ -3,4 +3,4 @@ sim_build
 __pycache__
 *.vcd
 *.memh
-training/output
+.DS_Store
