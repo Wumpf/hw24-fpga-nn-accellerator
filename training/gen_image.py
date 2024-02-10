@@ -69,7 +69,7 @@ model = Sequential([
     Dense(layer_size, input_dim=embedding_size*2, activation='relu'),
     Dense(layer_size, activation='relu'),
     Dense(layer_size, activation='relu'),
-    Dense(3, activation='sigmoid')  # Use 'sigmoid' to output values between 0 and 1
+    Dense(3, activation='relu')
 ])
 
 model.compile(optimizer='nadam', loss='mean_squared_error')
