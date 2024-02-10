@@ -4,3 +4,4 @@ __pycache__
 *.vcd
 *.memh
 training/output
+.DS_Store
