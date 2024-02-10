@@ -5,6 +5,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import rerun as rr
 from fxpmath import Fxp
+import tensorflow as tf
 
 # List all available devices
 devices = tf.config.list_physical_devices()
