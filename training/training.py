@@ -10,7 +10,7 @@ rr.init("train_image", spawn=True)
 image_path = 'pretty_256.png'
 image = Image.open(image_path)
 image = image.resize((64, 64))
-image = image.convert('RGB')
+image = image.convert('RGBA')
 width, height = image.size
 
 rr.log("train_input", rr.Image(image))
@@ -23,8 +23,8 @@ history = nn.train(image, 100, 32)
 
 nn.write_quantized_weights("output")
 
-predicted_rgb = nn.predict()
+predicted_rgba = nn.predict()
 
-generated_image = Image.fromarray(predicted_rgb)
+generated_image = Image.fromarray(predicted_rgba, 'RGBA')
 
 rr.log("train_output", rr.Image(generated_image))

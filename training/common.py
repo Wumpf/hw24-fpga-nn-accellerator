@@ -27,10 +27,10 @@ class NeuralNetwork(object):
         self.__encoded_pos = self.__encode_positions()
 
         self.__model = Sequential([
-            Dense(layer_size, input_dim=embedding_size*2, activation='relu'),
-            Dense(layer_size, activation='relu'),
-            Dense(layer_size, activation='relu'),
-            Dense(3, activation='relu')
+            Dense(self.__layer_size, input_dim=embedding_size*2, activation='relu'),
+            Dense(self.__layer_size, activation='relu'),
+            Dense(self.__layer_size, activation='relu'),
+            Dense(4, activation='relu')
         ])
         self.__model.compile(optimizer='nadam', loss='mean_squared_error')
     
@@ -45,7 +45,7 @@ class NeuralNetwork(object):
                         for y in self.__x_coords for x in self.__y_coords])
 
     def train(self, image, epochs=100, batch_size=32):
-        Y = (np.array(image) / 255.0).reshape(-1, 3)
+        Y = (np.array(image) / 255.0).reshape(-1, 4)
         return self.__model.fit(self.__encoded_pos, Y, epochs=epochs, batch_size=batch_size, verbose=True, validation_split=.1)  # Adjust epochs and batch size as needed
 
     def __load_ascii(self, folder, name):
@@ -67,14 +67,14 @@ class NeuralNetwork(object):
                 "dense": (self.__load_ascii_reshape(folder, "dense_weights", 64, 64), self.__load_ascii(folder, "dense_biases")),
                 "dense_1": (self.__load_ascii_reshape(folder, "dense_1_weights", 64, 64), self.__load_ascii(folder, "dense_1_biases")),
                 "dense_2": (self.__load_ascii_reshape(folder, "dense_2_weights", 64, 64), self.__load_ascii(folder, "dense_2_biases")),
-                "dense_3": (self.__load_ascii_reshape(folder, "dense_3_weights", 64, 3), self.__load_ascii(folder, "dense_3_biases"))
+                "dense_3": (self.__load_ascii_reshape(folder, "dense_3_weights", 64, 4), self.__load_ascii(folder, "dense_3_biases"))
             }
         for layer, values in layers.items():
                 self.__model.get_layer(layer).set_weights(values)
 
     def predict(self):
-        predicted_rgb = self.__model.predict(self.__encoded_pos) * 255  # Rescale the output
-        return predicted_rgb.reshape((self.__img_height, self.__img_width, 3)).astype(np.uint8)
+        predicted_rgba = self.__model.predict(self.__encoded_pos) * 255  # Rescale the output
+        return predicted_rgba.reshape((self.__img_height, self.__img_width, 4)).astype(np.uint8)
 
     def __quantize_parameters(self):
         w_dict = {}
