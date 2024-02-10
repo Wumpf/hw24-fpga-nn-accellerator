@@ -6,14 +6,19 @@ import matplotlib.pyplot as plt
 import rerun as rr
 from fxpmath import Fxp
 
+# List all available devices
+devices = tf.config.list_physical_devices()
+print(f"Devices: {devices}")
+
 rr.init("train_image", spawn=True)
 
 # Load an animated gif and convert it to a sequence of images
 # image_path = 'face2_input.gif'
 
 # Load the image
-image_path = 'training_input.png'
+image_path = 'face_training.png'
 image = Image.open(image_path)
+image = image.resize((64, 64))
 width, height = image.size
 
 # Convert the image to RGB (if it's not already in RGB)
@@ -38,8 +43,10 @@ y_coords = np.arange(height).reshape(-1, 1) / height  # Normalize y coordinates
 #X = np.array([np.array([[x,y] for i in range(128)]).flatten()
 #               for y in y_coords for x in x_coords])
 
+
+joel = 128
 # the sin functions introduce artifacts at the bottom
-X = np.array([np.array([[np.sin(x * i), np.sin(y * i)] for i in range(128)]).flatten()
+X = np.array([np.array([[np.sin(x * i), np.sin(y * i)] for i in range(joel)]).flatten()
                for y in y_coords for x in x_coords])
 
 rr.log("log", rr.TextLog(str(X.shape)))
@@ -56,7 +63,7 @@ layer_size = 64
 model = Sequential([
     Dense(layer_size, input_dim=256, activation='relu'),
     Dense(layer_size, activation='relu'),
-    Dense(layer_size, activation='relu'),
+    #Dense(layer_size, activation='relu'),
     Dense(3, activation='sigmoid')  # Use 'sigmoid' to output values between 0 and 1
 ])
 
@@ -71,26 +78,32 @@ for layer in model.layers:
     print('{} (weights):\tmean = {}\tstd = {}'.format(layer.name, np.mean(w_dict[layer.name][0]), np.std(w_dict[layer.name][0])))
     print('{} (bias):\t\tmean = {}\tstd = {}\n'.format(layer.name, np.mean(w_dict[layer.name][1]), np.std(w_dict[layer.name][1])))
 
-# convert to fixed point
-fxp_ref = Fxp(None, dtype='fxp-s16/15')
-w_fxp_dict = {}
-for layer in w_dict.keys():
-    w_fxp_dict[layer] = [
-        Fxp(w_dict[layer][0], like=fxp_ref), 
-        Fxp(w_dict[layer][1], like=fxp_ref),
-        ]
-    
-# update model with fixed point and evaluate
-for layer, values in w_fxp_dict.items():
-    model.get_layer(layer).set_weights(values)
+def convert_to_fxp():
+    # convert to fixed point
+    fxp_ref = Fxp(None, dtype='fxp-s8/7')
+    w_fxp_dict = {}
+    for layer in w_dict.keys():
+        w_fxp_dict[layer] = [
+            Fxp(w_dict[layer][0], like=fxp_ref), 
+            Fxp(w_dict[layer][1], like=fxp_ref),
+            ]
+        
+    # update model with fixed point and evaluate
+    for layer, values in w_fxp_dict.items():
+        model.get_layer(layer).set_weights(values)
 
-# write out layers of fixed point weights as a binary with a file per layer
-for layer, values in w_fxp_dict.items():
-    # print out the first 3 values of the weights
-    print(f"{layer} weights: {values[0][:3]}")
-    int_values = np.array([int(val) for val in values], dtype=np.int16)
-    with open(f"{layer}_weights.bin", "wb") as f:
-        int_values[0].tofile(f)
+    # write out layers of fixed point weights as a binary with a file per layer
+    for layer, values in w_fxp_dict.items():
+        i = 0
+        values, biases = values
+        for v_array in values:
+            #print(repr(v_array))
+            int_values = np.array([int(val) for val in v_array], dtype=np.int8)
+            with open(f"output/{layer}_weights_{i}.bin", "wb") as f:
+                int_values.tofile(f)
+            i += 1
+
+convert_to_fxp()
 
 predicted_rgb = model.predict(X) * 255  # Rescale the output
 predicted_rgb = predicted_rgb.reshape((height, width, 3)).astype(np.uint8)
@@ -109,8 +122,6 @@ generated_image = Image.fromarray(predicted_rgb)
 # plt.xlabel('Epoch')
 # plt.legend()
 # plt.show()
-
-fxp_ref = Fxp(None, dtype='fxp-s16/15')
 
 
 rr.log("train_output", rr.Image(generated_image))
