@@ -1,15 +1,97 @@
 
-
-module multiply_add (
+module multiply_add_accumulator (
+    input clk,
+    input reset,
     input wire[15:0] a,
     input wire[15:0] b,
-    input wire[30:0] c,
 
-    output wire[31:0] out
+    output reg[31:0] out
 );
 
-    assign out = a * b + c;
+    reg[31:0] accumulator;
+    always @(posedge clk) begin
+        if (reset)
+            accumulator <= 0;
+        else
+            accumulator <= accumulator + a * b;
+    end
 
+    assign out = accumulator;
+
+endmodule
+
+
+// info how to setup SB_MAC16: https://trmm.net/Multiplier/
+module multiply_add_accumulator2 (
+    input clk,
+    input reset,
+    input enable,
+    input wire[15:0] a,
+    input wire[15:0] b,
+
+    output reg[31:0] out
+);
+    wire [15:0] dsp_c = 16'b0;
+    wire [15:0] dsp_d = 16'b0;
+
+    reg dsp_oloadtop;
+    reg dsp_oloadbot;
+
+    reg dsp_irsttop;
+    reg dsp_irstbot;
+    reg dsp_orsttop;
+    reg dsp_orstbot;
+    reg dsp_ahold;
+    reg dsp_bhold;
+    reg dsp_chold;
+    reg dsp_dhold;
+    reg dsp_oholdtop;
+    reg dsp_oholdbot;
+    reg dsp_addsubtop;
+    reg dsp_addsubbot;
+    reg dsp_oloadtop;
+    reg dsp_oloadbot;
+    reg dsp_ci;
+
+    always @(posedge clk) begin
+        dsp_irsttop <= 0;
+        dsp_irstbot <= 0;
+        dsp_orsttop <= 0;
+        dsp_orstbot <= 0;
+        dsp_ahold <= 0;
+        dsp_bhold <= 0;
+        dsp_chold <= 0;
+        dsp_dhold <= 0;
+        dsp_oholdtop <= 0;
+        dsp_oholdbot <= 0;
+        dsp_addsubtop <= 0;
+        dsp_addsubbot <= 0;
+        dsp_oloadtop <= reset;
+        dsp_oloadbot <= reset;
+        dsp_ci <= 0;        
+    end
+
+    //setup the dsp, parameters TOPADDSUB_LOWERINPUT and BOTADDSUB_LOWERINPUT at 2 means we can use MAC operations
+    SB_MAC16 #(
+        .TOPOUTPUT_SELECT(2'b00), // adder, unregistered
+        .TOPADDSUB_LOWERINPUT(2'b10), // multiplier hi bits
+        .TOPADDSUB_UPPERINPUT(1'b0), // input C
+        .TOPADDSUB_CARRYSELECT(2'b11), // top carry in is bottom carry out
+        .BOTOUTPUT_SELECT(2'b00), // adder, unregistered
+        .BOTADDSUB_LOWERINPUT(2'b10), // multiplier lo bits
+        .BOTADDSUB_UPPERINPUT(1'b0), // input D
+        .BOTADDSUB_CARRYSELECT(2'b00) // bottom carry in constant 0
+    ) SB_MAC16_inst(
+      .CLK(clk), .CE(enable), .C(dsp_c), .A(a), .B(b), .D(dsp_d),
+      
+      .IRSTTOP(dsp_irsttop), .IRSTBOT(dsp_irstbot), .ORSTTOP(dsp_orsttop), .ORSTBOT(dsp_orstbot),
+      .AHOLD(dsp_ahold), .BHOLD(dsp_bhold), .CHOLD(dsp_chold), .DHOLD(dsp_dhold), .OHOLDTOP(dsp_oholdtop), .OHOLDBOT(dsp_oholdbot),
+      .ADDSUBTOP(dsp_addsubtop), .ADDSUBBOT(dsp_addsubbot),
+      .CI(dsp_ci), .CO(dsp_co),
+
+      .OLOADTOP(dsp_oloadtop), .OLOADBOT(dsp_oloadbot),
+      .O(out)
+    );
 endmodule
 
 
@@ -29,48 +111,44 @@ module mac_not_yet_a_grid(
         $readmemh("activations.memh", activations_memory);
     end
 
+    reg [15:0] mac_a;
+    reg [15:0] mac_b;
+    multiply_add_accumulator2 mac(
+        .clk(clk),
+        .reset(reset),
+        .enable(1),
+        .a(mac_a),
+        .b(mac_b),
+        .out(out)
+    );
+
     reg [63:0] time_counter = 0;
     reg [15:0] counter = 0;
-    // wire [15:0] w;
-    // wire [15:0] a;
-    reg [31:0] accumulator = 0;
     always @(posedge clk) begin
         if (reset) begin
             counter <= 0;
-            accumulator <= 0;
-        end else if (counter < 256) begin
-`ifdef FPGA_TEST
-            if (time_counter == 12_000_000/16) begin
-                time_counter <= 0;
-                counter <= counter + 1;
+            mac_a <= 0;
+            mac_b <= 0;
+        end else if (counter < 256 && time_counter == 12_000_000/30) begin
+            time_counter <= 0;
+            counter <= counter + 1;
 
-                accumulator <= accumulator +
-                            weights_memory[counter] *
-                            activations_memory[counter];
-
-                // accumulator <= {weights_memory[counter],
-                //                 activations_memory[counter]};
-
-                // accumulator <= {weights_memory[counter] *
-                //                 activations_memory[counter]};
-            end else
-                time_counter <= time_counter + 1;
-`else
-                counter <= counter + 1;
-                accumulator <= accumulator +
-                            weights_memory[counter] *
-                            activations_memory[counter];
-`endif
+            mac_a <= weights_memory[counter];
+            mac_b <= activations_memory[counter];
+        end else begin
+            time_counter <= time_counter + 1;
+            mac_a <= 0;
+            mac_b <= 0;
         end
     end
 
-    assign out = accumulator;
+    // assign out = accumulator;
     assign progress = counter;
 
 endmodule
 
 
-// `define VGA
+`define VGA
 // `define DVI
 
 module top (
