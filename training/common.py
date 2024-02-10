@@ -47,7 +47,7 @@ class NeuralNetwork(object):
         return format(struct.unpack('!I', struct.pack('!f', float_value))[0], '032b')
 
     def __interleave_bits(self, x, y):
-        bin_x = self.__float_to_binary(x * 436)
+        bin_x = self.__float_to_binary(x)
         bin_y = self.__float_to_binary(y * 6057489)
         
         return np.array([int(bit) for pair in zip(bin_x, bin_y) for bit in pair])
