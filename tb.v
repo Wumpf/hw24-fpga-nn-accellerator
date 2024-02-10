@@ -18,6 +18,7 @@ module tb ();
 
     // wire up the inputs and outputs
     wire clk;
+    wire reset;
     //wire rst_n;
 
     wire LED1;
@@ -32,7 +33,7 @@ module tb ();
     wire BTN3;
 
     // tt_hw23_nn_accelerator
-    blinky top
+    blinky blinky
     (
         .CLK(clk),
 
@@ -46,6 +47,17 @@ module tb ();
         .BTN1(BTN1),
         .BTN2(BTN2),
         .BTN3(BTN3)
+    );
+
+
+    reg [31:0] accumulator;
+    reg [15:0] progress;
+    mac_not_yet_a_grid top
+    (
+        .clk(clk),
+        .reset(reset),
+        .out(accumulator),
+        .progress(progress)
     );
 
 endmodule
