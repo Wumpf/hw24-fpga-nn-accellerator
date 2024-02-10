@@ -52,7 +52,7 @@ module tb ();
 
     reg [31:0] accumulator;
     reg [15:0] progress;
-    mac_not_yet_a_grid top
+    mac_grid top
     (
         .clk(clk),
         .reset(reset),

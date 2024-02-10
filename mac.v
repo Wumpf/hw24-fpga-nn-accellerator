@@ -1,7 +1,8 @@
 
-module multiply_add_accumulator (
+module multiply_add_accumulator_ (
     input clk,
     input reset,
+    input enable,
     input wire[15:0] a,
     input wire[15:0] b,
 
@@ -12,7 +13,7 @@ module multiply_add_accumulator (
     always @(posedge clk) begin
         if (reset)
             accumulator <= 0;
-        else
+        else if (enable)
             accumulator <= accumulator + a * b;
     end
 
@@ -22,7 +23,7 @@ endmodule
 
 
 // info how to setup SB_MAC16: https://trmm.net/Multiplier/
-module multiply_add_accumulator2 (
+module multiply_add_accumulator (
     input clk,
     input reset,
     input enable,
@@ -33,9 +34,6 @@ module multiply_add_accumulator2 (
 );
     wire [15:0] dsp_c = 16'b0;
     wire [15:0] dsp_d = 16'b0;
-
-    reg dsp_oloadtop;
-    reg dsp_oloadbot;
 
     reg dsp_irsttop;
     reg dsp_irstbot;
@@ -113,7 +111,7 @@ module mac_not_yet_a_grid(
 
     reg [15:0] mac_a;
     reg [15:0] mac_b;
-    multiply_add_accumulator2 mac(
+    multiply_add_accumulator mac(
         .clk(clk),
         .reset(reset),
         .enable(1),
@@ -129,7 +127,7 @@ module mac_not_yet_a_grid(
             counter <= 0;
             mac_a <= 0;
             mac_b <= 0;
-        end else if (counter < 256 && time_counter == 12_000_000/30) begin
+        end else if (counter < 256) begin // && time_counter == 12_000_000/30) begin
             time_counter <= 0;
             counter <= counter + 1;
 
@@ -139,6 +137,113 @@ module mac_not_yet_a_grid(
             time_counter <= time_counter + 1;
             mac_a <= 0;
             mac_b <= 0;
+        end
+    end
+
+    // assign out = accumulator;
+    assign progress = counter;
+
+endmodule
+
+module mac_grid(
+    input clk,
+    input reset,
+    output [31:0] out,
+    output [15:0] progress
+);
+
+    reg [15:0] weights_memory [0:255];
+    reg [15:0] activations_memory [0:255];
+    initial begin
+        $readmemh("weights.memh", weights_memory);
+        $readmemh("activations.memh", activations_memory);
+    end
+
+    reg [15:0] mac_a_1;
+    reg [15:0] mac_b_1;
+    reg [15:0] mac_a_2;
+    reg [15:0] mac_b_2;
+    reg [15:0] mac_a_3;
+    reg [15:0] mac_b_3;
+    reg [15:0] mac_a_4;
+    reg [15:0] mac_b_4;
+    wire [31:0] out_1;
+    wire [31:0] out_2;
+    wire [31:0] out_3;
+    wire [31:0] out_4;
+    assign out = out_1 + out_2 + out_3 + out_4;
+    multiply_add_accumulator mac_1(
+        .clk(clk),
+        .reset(reset),
+        .enable(1'b1),
+        .a(mac_a_1),
+        .b(mac_b_1),
+        .out(out_1)
+    );
+
+    multiply_add_accumulator mac_2(
+        .clk(clk),
+        .reset(reset),
+        .enable(1'b1),
+        .a(mac_a_2),
+        .b(mac_b_2),
+        .out(out_2)
+    );
+
+    multiply_add_accumulator mac_3(
+        .clk(clk),
+        .reset(reset),
+        .enable(1'b1),
+        .a(mac_a_3),
+        .b(mac_b_3),
+        .out(out_3)
+    );
+
+    multiply_add_accumulator mac_4(
+        .clk(clk),
+        .reset(reset),
+        .enable(1'b1),
+        .a(mac_a_4),
+        .b(mac_b_4),
+        .out(out_4)
+    );
+
+    reg [63:0] time_counter = 0;
+    reg [15:0] counter = 0;
+    always @(posedge clk) begin
+        if (reset) begin
+            counter <= 0;
+            mac_a_1 <= 0;
+            mac_b_1 <= 0;
+            mac_a_2 <= 0;
+            mac_b_2 <= 0;
+            mac_a_3 <= 0;
+            mac_b_3 <= 0;
+            mac_a_4 <= 0;
+            mac_b_4 <= 0;
+        end else if (counter < 256/4) begin //  && time_counter == 12_000_000/30) begin
+            time_counter <= 0;
+            counter <= counter + 1;
+
+            mac_a_1 <= weights_memory[counter*4+0];
+            mac_b_1 <= activations_memory[counter*4+0];
+            mac_a_2 <= weights_memory[counter*4+1];
+            mac_b_2 <= activations_memory[counter*4+1];
+            mac_a_3 <= weights_memory[counter*4+2];
+            mac_b_3 <= activations_memory[counter*4+2];
+            mac_a_4 <= weights_memory[counter*4+3];
+            mac_b_4 <= activations_memory[counter*4+3];
+
+        end else begin
+            time_counter <= time_counter + 1;
+            mac_a_1 <= 0;
+            mac_b_1 <= 0;
+            mac_a_2 <= 0;
+            mac_b_2 <= 0;
+            mac_a_3 <= 0;
+            mac_b_3 <= 0;
+            mac_a_4 <= 0;
+            mac_b_4 <= 0;
         end
     end
 
@@ -183,7 +288,8 @@ module top (
 
 `ifdef VGA
     wire [31:0] accumulator;
-    mac_not_yet_a_grid mac_not_yet_a_grid(
+    // mac_not_yet_a_grid mac_not_yet_a_grid(
+    mac_grid mac_grid(
         // .clk(CLK),
         .clk(clk_pixel),
         .reset(BTN1),
