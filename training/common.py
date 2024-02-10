@@ -19,7 +19,10 @@ class NeuralNetwork(object):
     def __init__(self, img_width, img_height, layer_size, embedding_size, channels) -> None:
         self.__img_width = img_width
         self.__img_height = img_height
-        self.__layer_size = layer_size
+        self.__layer_size0 = layer_size
+        self.__layer_size1 = layer_size
+        #self.__layer_size2 = int(layer_size / 4)
+        self.__layer_size2 = layer_size
         self.__embedding_size = embedding_size
         self.__channels = channels
 
@@ -30,9 +33,9 @@ class NeuralNetwork(object):
         #self.__encoded_pos = self.__encode_positions()
 
         self.__model = Sequential([
-            Dense(self.__layer_size, input_dim=embedding_size*2, activation='relu'),
-            Dense(self.__layer_size, activation='relu'),
-            Dense(self.__layer_size, activation='relu'),
+            Dense(self.__layer_size0, input_dim=embedding_size*2, activation='relu'),
+            Dense(self.__layer_size1, activation='relu'),
+            Dense(self.__layer_size2, activation='relu'),
             Dense(self.__channels, activation='hard_sigmoid')
         ])
         self.__model.compile(optimizer='nadam', loss='mean_squared_error')
@@ -44,7 +47,7 @@ class NeuralNetwork(object):
         return format(struct.unpack('!I', struct.pack('!f', float_value))[0], '032b')
 
     def __interleave_bits(self, x, y):
-        bin_x = self.__float_to_binary(x)
+        bin_x = self.__float_to_binary(x * 436)
         bin_y = self.__float_to_binary(y * 6057489)
         
         return np.array([int(bit) for pair in zip(bin_x, bin_y) for bit in pair])
@@ -79,13 +82,25 @@ class NeuralNetwork(object):
 
     def load_weights_from_folder(self, folder):
         layers = {
-                "dense": (self.__load_ascii_reshape(folder, "dense_weights", 64, 64), self.__load_ascii(folder, "dense_biases")),
-                "dense_1": (self.__load_ascii_reshape(folder, "dense_1_weights", 64, 64), self.__load_ascii(folder, "dense_1_biases")),
-                "dense_2": (self.__load_ascii_reshape(folder, "dense_2_weights", 64, 64), self.__load_ascii(folder, "dense_2_biases")),
-                "dense_3": (self.__load_ascii_reshape(folder, "dense_3_weights", 64, self.__channels), self.__load_ascii(folder, "dense_3_biases"))
-            }
+            "dense": (
+                self.__load_ascii_reshape(folder, "dense_weights", 64, self.__layer_size0),
+                self.__load_ascii(folder, "dense_biases"),
+            ),
+            "dense_1": (
+                self.__load_ascii_reshape(folder, "dense_1_weights", self.__layer_size0, self.__layer_size1),
+                self.__load_ascii(folder, "dense_1_biases"),
+            ),
+            "dense_2": (
+                self.__load_ascii_reshape(folder, "dense_2_weights", self.__layer_size1, self.__layer_size2),
+                self.__load_ascii(folder, "dense_2_biases"),
+            ),
+            "dense_3": (
+                self.__load_ascii_reshape(folder, "dense_3_weights", self.__layer_size2, self.__channels),
+                self.__load_ascii(folder, "dense_3_biases"),
+            ),
+        }
         for layer, values in layers.items():
-                self.__model.get_layer(layer).set_weights(values)
+            self.__model.get_layer(layer).set_weights(values)
 
     def predict(self):
         predicted_rgba = self.__model.predict(self.__encoded_pos) * 255  # Rescale the output
