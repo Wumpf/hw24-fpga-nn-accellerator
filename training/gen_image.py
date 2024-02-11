@@ -1,10 +1,11 @@
+import os
 import rerun as rr
 
 import numpy as np
 
 from PIL import Image
 
-from common import NeuralNetwork, write_array_to_memh_file, quantize_array
+from common import NeuralNetwork
 
 def quantize_array_2(values):
     d = 256.0/8.0
@@ -13,6 +14,12 @@ def quantize_array_2(values):
     values = np.floor(values)
     values /= d
     return values
+
+def write_array_to_memh_file_2(values, name, folder):
+    with open(os.path.join(folder, f"{name}.txt"), "w") as f:
+        for m in values.flatten() * (256.0/8.0):
+            assert m >= 0
+            f.write(f"{int(m):0{2}x} ")
 
 rr.init("test_ascii", spawn=True)
 
@@ -37,13 +44,13 @@ rr.log("train_output", rr.Image(generated_image))
 
 activations = nn.predict_with_activations()
 
-write_array_to_memh_file(quantize_array_2(nn.encoded_pos()), "encoded_pos", "output_with_eyes")
+write_array_to_memh_file_2(quantize_array_2(nn.encoded_pos()), "encoded_pos", "output_with_eyes")
 
 for i, a in enumerate(activations):
     qa = quantize_array_2(a)
     print(f"min/max activation_{i}: {np.min(a)} / {np.max(a)}, mean: {np.mean(a)}, std: {np.std(a)}")
     print(f"min/max quantized activation_{i}: {np.min(qa)} / {np.max(qa)}, mean: {np.mean(qa)}, std: {np.std(qa)}")
-    write_array_to_memh_file(
+    write_array_to_memh_file_2(
         quantize_array_2(a), f"activation_{i}", "output_with_eyes")
 
 rr.log("last_activation", rr.Image((activations[-1] * 255).reshape((64, 64, 4)).astype(np.uint8)))
