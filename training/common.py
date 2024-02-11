@@ -27,8 +27,8 @@ def write_array_to_memh_file(values, name, folder):
     with open(os.path.join(folder, f"{name}.txt"), "w") as f:
         for m in values.flatten() * 127.0:
             m = int(m)
+            assert -127 <= m <= 127
             m_signed_byte = struct.pack('b', m)
-            assert m_signed_byte >= struct.pack('b', 0)
             f.write(f"{m_signed_byte.hex()} ")
 
 class NeuralNetwork(object):
@@ -89,17 +89,15 @@ class NeuralNetwork(object):
 
     def __load_ascii(self, folder, name):
         with open(f"{folder}/{name}.txt", "r") as f:
-            floats = np.array([float(int(x, 16)) for x in f.read().strip().split(" ")])
-            floats -= 127
-            floats /= 127.0
+            hex_values = f.read().strip().split(" ")
+            floats = np.array(
+                [int.from_bytes(
+                    int(value, 16).to_bytes(1, byteorder='little', signed=False), 'little', signed=True) for value in hex_values], dtype=np.float32)
+            floats /= 128.0
             return floats
         
     def __load_ascii_reshape(self, folder, name, x, y):
-        with open(f"{folder}/{name}.txt", "r") as f:
-            floats = np.array([float(int(x, 16)) for x in f.read().strip().split(" ")])
-            floats -= 127
-            floats /= 127.0
-            return floats.reshape((x, y))
+        return self.__load_ascii(folder, name).reshape((x, y))
 
     def load_weights_from_folder(self, folder):
         layers = {
