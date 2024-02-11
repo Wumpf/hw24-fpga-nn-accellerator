@@ -15,6 +15,7 @@ else:
 
 # Load the image
 image_path = 'face_input.png'
+#image_path = 'training_input.png'
 image = Image.open(image_path)
 image = image.resize((64, 64))
 image = image.convert(mode)

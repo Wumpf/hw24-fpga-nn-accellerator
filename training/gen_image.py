@@ -6,6 +6,14 @@ from PIL import Image
 
 from common import NeuralNetwork, write_array_to_memh_file, quantize_array
 
+def quantize_array_2(values):
+    d = 256.0/8.0
+    values = np.clip(values, 0.0, 8.0)
+    values *= d
+    values = np.floor(values)
+    values /= d
+    return values
+
 rr.init("test_ascii", spawn=True)
 
 if True:
@@ -30,8 +38,11 @@ rr.log("train_output", rr.Image(generated_image))
 activations = nn.predict_with_activations()
 
 for i, a in enumerate(activations):
+    qa = quantize_array_2(a)
+    print(f"min/max activation_{i}: {np.min(a)} / {np.max(a)}, mean: {np.mean(a)}, std: {np.std(a)}")
+    print(f"min/max quantized activation_{i}: {np.min(qa)} / {np.max(qa)}, mean: {np.mean(qa)}, std: {np.std(qa)}")
     write_array_to_memh_file(
-        quantize_array(a), f"activation_{i}", "output_with_eyes")
+        quantize_array_2(a), f"activation_{i}", "output_with_eyes")
 
 rr.log("last_activation", rr.Image((activations[-1] * 255).reshape((64, 64, 4)).astype(np.uint8)))
-rr.log("last_activation_quantized", rr.Image((quantize_array(activations[-1]) * 255).reshape((64, 64, 4)).astype(np.uint8)))
+rr.log("last_activation_quantized", rr.Image((quantize_array_2(activations[-1]) * 255).reshape((64, 64, 4)).astype(np.uint8)))
