@@ -17,7 +17,7 @@ def gen_gradient_image(w, h):
 
 
 def quantize_array(values):
-    d = 128.0
+    d = 127.0
     values = np.clip(values, -1.0, 1.0)
     values *= d
     values = np.floor(values)
@@ -26,7 +26,8 @@ def quantize_array(values):
 
 def write_array_to_memh_file(values, name, folder):
     with open(os.path.join(folder, f"{name}.txt"), "w") as f:
-        for m in values.flatten() * 128.0 + 127.0:
+        for m in values.flatten() * 127.0 + 127.0:
+            assert m >= 0
             f.write(f"{int(m):0{2}x} ")
 
 class NeuralNetwork(object):
@@ -53,6 +54,9 @@ class NeuralNetwork(object):
             Dense(self.__channels, activation='hard_sigmoid')
         ])
         self.__model.compile(optimizer='nadam', loss='mean_squared_error')
+    
+    def encoded_pos(self):
+        return self.__encoded_pos
     
     def __encode_positions_interleaved_bits(self):
         return np.array([self.__interleave_bits(x, y) for x in self.__x_coords for y in self.__y_coords])
@@ -84,14 +88,14 @@ class NeuralNetwork(object):
         with open(f"{folder}/{name}.txt", "r") as f:
             floats = np.array([float(int(x, 16)) for x in f.read().strip().split(" ")])
             floats -= 127
-            floats /= 128.0
+            floats /= 127.0
             return floats
         
     def __load_ascii_reshape(self, folder, name, x, y):
         with open(f"{folder}/{name}.txt", "r") as f:
             floats = np.array([float(int(x, 16)) for x in f.read().strip().split(" ")])
             floats -= 127
-            floats /= 128.0
+            floats /= 127.0
             return floats.reshape((x, y))
 
     def load_weights_from_folder(self, folder):

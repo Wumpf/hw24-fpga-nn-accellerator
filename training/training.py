@@ -27,7 +27,7 @@ embedding_size = 32
 layer_size = 64
 nn = NeuralNetwork(width, height, layer_size, embedding_size, channels)
 
-history = nn.train(image, 100, 32)
+history = nn.train(image, 200, 32)
 
 nn.write_quantized_weights("output")
 

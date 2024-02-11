@@ -37,6 +37,8 @@ rr.log("train_output", rr.Image(generated_image))
 
 activations = nn.predict_with_activations()
 
+write_array_to_memh_file(quantize_array_2(nn.encoded_pos()), "encoded_pos", "output_with_eyes")
+
 for i, a in enumerate(activations):
     qa = quantize_array_2(a)
     print(f"min/max activation_{i}: {np.min(a)} / {np.max(a)}, mean: {np.mean(a)}, std: {np.std(a)}")
