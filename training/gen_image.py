@@ -5,7 +5,7 @@ import numpy as np
 
 from PIL import Image
 
-from common import NeuralNetwork
+from common import NeuralNetwork, quantize_array, write_array_to_memh_file
 
 def quantize_array_2(values):
     d = 256.0/8.0
@@ -44,7 +44,7 @@ rr.log("train_output", rr.Image(generated_image))
 
 activations = nn.predict_with_activations()
 
-write_array_to_memh_file_2(quantize_array_2(nn.encoded_pos()), "encoded_pos", "output_with_eyes")
+write_array_to_memh_file(quantize_array(nn.encoded_pos()), "encoded_pos", "output_with_eyes")
 
 for i, a in enumerate(activations):
     qa = quantize_array_2(a)
