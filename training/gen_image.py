@@ -21,7 +21,7 @@ layer_size = 64
 
 nn = NeuralNetwork(width, height, layer_size, embedding_size, channels)
 
-nn.load_weights_from_folder("output/with_eyes")
+nn.load_weights_from_folder("output_with_eyes")
 predicted_rgb = nn.predict()
 generated_image = Image.fromarray(predicted_rgb, 'RGBA')
 
@@ -31,7 +31,7 @@ activations = nn.predict_with_activations()
 
 for i, a in enumerate(activations):
     write_array_to_memh_file(
-        quantize_array(a), f"activation_{i}", "output/with_eyes")
+        quantize_array(a), f"activation_{i}", "output_with_eyes")
 
 rr.log("last_activation", rr.Image((activations[-1] * 255).reshape((64, 64, 4)).astype(np.uint8)))
 rr.log("last_activation_quantized", rr.Image((quantize_array(activations[-1]) * 255).reshape((64, 64, 4)).astype(np.uint8)))

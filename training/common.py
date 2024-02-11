@@ -62,9 +62,9 @@ class NeuralNetwork(object):
 
     def __interleave_bits(self, x, y):
         bin_x = self.__float_to_binary(x)
-        bin_y = self.__float_to_binary(y * 6057489)
+        bin_y = self.__float_to_binary(y)
         
-        return np.array([int(bit) for pair in zip(bin_x, bin_y) for bit in pair])
+        return np.array([int(bit) for pair in (bin_x + bin_y) for bit in pair])
     
     def __encode_positions(self):
         seed = 127
