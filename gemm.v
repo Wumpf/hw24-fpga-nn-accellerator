@@ -52,8 +52,8 @@ module gemm_processor
 ) (
     input clk,
     input reset,
-    output [7:0] out [0:NEURONS*2-1],
-    output reg [7:0] out2,
+    output [7:0] activations_out [0:NEURONS*2-1],
+    output [7:0] accumulator_out [0:MAC_COUNT-1],
     output [15:0] progress,
     output [7:0] command
 );
@@ -179,6 +179,6 @@ module gemm_processor
 
     assign progress = pc;
     assign command = {clear_accumulators, activations_in_addr, bias_addr, activations_out_addr};
-    assign out = activations;
-    assign out2 = activations[0];
+    assign activations_out = activations;
+    assign accumulator_out = mac_out_relu;
 endmodule

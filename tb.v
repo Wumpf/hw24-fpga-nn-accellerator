@@ -62,15 +62,15 @@ module tb ();
 
     // reg [15:0] activations [0:63];
     wire [7:0] activations [0:127];
-    wire [7:0] activations2;
+    wire [7:0] accumulators [0:31];
     reg [15:0] pc;
     reg [7:0] command;
     gemm_processor gemm_processor
     (
         .clk(clk),
         .reset(reset),
-        .out(activations),
-        .out2(activations2),
+        .activations_out(activations),
+        .accumulator_out(accumulators),
         .progress(pc),
         .command(command)
     );
