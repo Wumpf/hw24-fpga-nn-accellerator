@@ -37,7 +37,7 @@ class NeuralNetwork(object):
         self.__layer_size0 = layer_size
         self.__layer_size1 = layer_size
         #self.__layer_size2 = int(layer_size / 4)
-        self.__layer_size2 = layer_size
+        self.__layer_size2 = layer_size // 2
         self.__embedding_size = embedding_size
         self.__channels = channels
 
