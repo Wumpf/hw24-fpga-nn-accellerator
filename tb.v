@@ -52,12 +52,30 @@ module tb ();
 
     reg [31:0] accumulator;
     reg [15:0] progress;
-    mac_grid top
+    mac_grid mac_grid
     (
         .clk(clk),
         .reset(reset),
         .out(accumulator),
         .progress(progress)
     );
+
+    // reg [15:0] activations [0:63];
+    wire [7:0] activations [0:127];
+    wire [7:0] activations2;
+    reg [15:0] pc;
+    reg [7:0] command;
+    gemm_processor gemm_processor
+    (
+        .clk(clk),
+        .reset(reset),
+        .out(activations),
+        .out2(activations2),
+        .progress(pc),
+        .command(command)
+    );
+
+
+
 
 endmodule
