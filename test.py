@@ -69,7 +69,14 @@ async def gemm_processor_test(dut):
     dut._log.info("calculate")
     dut.reset.value = 0
     print ([int(n) for n in dut.activations.value])
+    print ([int(n) for n in dut.accumulators.value])
+    assert all([int(n) == 0 for n in dut.accumulators.value])
 
-    for i in range (512):
+    for i in range (4):
         await ClockCycles(dut.clk, 1)
+        if i == 0:
+            assert all([int(n) == 0 for n in dut.accumulators.value])
+        assert dut.pc.value == i
+        
         print ([int(n) for n in dut.activations.value], int(dut.pc.value), dut.command.value)
+        print ([int(n) for n in dut.accumulators.value])
