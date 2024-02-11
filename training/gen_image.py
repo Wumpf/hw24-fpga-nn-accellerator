@@ -30,4 +30,8 @@ rr.log("train_output", rr.Image(generated_image))
 activations = nn.predict_with_activations()
 
 for i, a in enumerate(activations):
-    write_array_to_memh_file(quantize_array(a), f"activation_{i}", "output/with_eyes")
+    write_array_to_memh_file(
+        quantize_array(a), f"activation_{i}", "output/with_eyes")
+
+rr.log("last_activation", rr.Image((activations[-1] * 255).reshape((64, 64, 4)).astype(np.uint8)))
+rr.log("last_activation_quantized", rr.Image((quantize_array(activations[-1]) * 255).reshape((64, 64, 4)).astype(np.uint8)))
