@@ -3,7 +3,7 @@ import shutil
 import struct
 import numpy as np
 
-from keras.models import Sequential
+from keras.models import Sequential, Model
 from keras.layers import Dense
 
 def gen_gradient_image(w, h):
@@ -14,6 +14,20 @@ def gen_gradient_image(w, h):
     for x in range(h):
         image[x, :, 1] = np.linspace(0, 255, h)
     return image
+
+
+def quantize_array(values):
+    d = 128.0
+    values = np.clip(values, -1.0, 1.0)
+    values *= d
+    values = np.floor(values)
+    values /= d
+    return values
+
+def write_array_to_memh_file(values, name, folder):
+    with open(os.path.join(folder, f"{name}.txt"), "w") as f:
+        for m in values.flatten() * 128.0 + 127.0:
+            f.write(f"{int(m):0{2}x} ")
 
 class NeuralNetwork(object):
     def __init__(self, img_width, img_height, layer_size, embedding_size, channels) -> None:
@@ -104,7 +118,13 @@ class NeuralNetwork(object):
 
     def predict(self):
         predicted_rgba = self.__model.predict(self.__encoded_pos) * 255  # Rescale the output
-        return predicted_rgba.reshape((self.__img_height, self.__img_width, self.__channels)).astype(np.uint8)
+        return predicted_rgba.reshape(
+            (self.__img_height, self.__img_width, self.__channels)).astype(np.uint8)
+    
+    def predict_with_activations(self):
+        layer_outputs = [layer.output for layer in self.__model.layers]  # Add all layers' output you're interested in here
+        activation_model = Model(inputs=self.__model.input, outputs=layer_outputs)
+        return activation_model.predict(self.__encoded_pos)
 
     def __quantize_parameters(self):
         w_dict = {}
@@ -115,26 +135,12 @@ class NeuralNetwork(object):
         for layer in w_dict.keys():
             weights, biases = w_dict[layer]
 
-            d = 128.0
-
-            weights = np.clip(weights, -1.0, 1.0)
-            weights *= d
-            weights = np.floor(weights)
-            weights /= d
-
-            biases = np.clip(biases, -1.0, 1.0)
-            biases *= d
-            biases = np.floor(biases)
-            biases /= d
-
-            quantized_params[layer] = (weights, biases)
+            quantized_params[layer] = (
+                quantize_array(weights),
+                quantize_array(biases)
+            )
         
         return quantized_params
-
-    def __write_array_to_memh_file(self, values, name, folder):
-        with open(os.path.join(folder, f"{name}.txt"), "w") as f:
-            for m in values.flatten() * 128.0 + 127.0:
-                f.write(f"{int(m):0{2}x} ")
 
     def __write_weights(self, quantized_params, folder):
         """Write the weights to binary files."""
@@ -143,8 +149,8 @@ class NeuralNetwork(object):
             
         os.makedirs(folder, exist_ok=True)
         for layer, values in quantized_params.items():
-            self.__write_array_to_memh_file(values[0], f"{layer}_weights", folder)
-            self.__write_array_to_memh_file(values[1], f"{layer}_biases", folder)
+            write_array_to_memh_file(values[0], f"{layer}_weights", folder)
+            write_array_to_memh_file(values[1], f"{layer}_biases", folder)
     
     def write_quantized_weights(self, folder):
         quantized_params = self.__quantize_parameters()
