@@ -56,5 +56,20 @@ for i, a in enumerate(activations):
     write_array_to_memh_file_2(
         quantize_array_2(a), f"activation_{i}", "output_with_eyes")
 
+def skip_4th_element(array):
+    if len(array) % 4 != 0:
+        raise ValueError("Array length must be divisible by 4.")
+    
+    mask = np.ones(len(array), dtype=bool)
+    mask[3::4] = False
+    return array[mask]
+
+def quantize_array_12_bits(values):
+    skipped_values = skip_4th_element(values.flatten())
+    return quantize_array_2(skipped_values)
+
+a = activations[-1]
+write_array_to_memh_file_2(quantize_array_12_bits(a), f"activation_{i}_12bits", "output_with_eyes")
+
 rr.log("last_activation", rr.Image((activations[-1] * 255).reshape((64, 64, 4)).astype(np.uint8)))
 rr.log("last_activation_quantized", rr.Image((quantize_array_2(activations[-1]) * 255).reshape((64, 64, 4)).astype(np.uint8)))
