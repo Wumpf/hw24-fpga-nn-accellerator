@@ -1,5 +1,6 @@
 import os
 import rerun as rr
+import struct
 
 import numpy as np
 
@@ -8,7 +9,7 @@ from PIL import Image
 from common import NeuralNetwork, quantize_array, write_array_to_memh_file
 
 def quantize_array_2(values):
-    d = 256.0/8.0
+    d = 255.0/8.0
     values = np.clip(values, 0.0, 8.0)
     values *= d
     values = np.floor(values)
@@ -17,9 +18,11 @@ def quantize_array_2(values):
 
 def write_array_to_memh_file_2(values, name, folder):
     with open(os.path.join(folder, f"{name}.txt"), "w") as f:
-        for m in values.flatten() * (256.0/8.0):
-            assert m >= 0
-            f.write(f"{int(m):0{2}x} ")
+        for m in values.flatten() * (255.0/8.0):
+            m = int(m)
+            m_signed_byte = struct.pack('B', m)
+            assert m_signed_byte >= struct.pack('B', 0)
+            f.write(f"{m_signed_byte.hex()} ")
 
 rr.init("test_ascii", spawn=True)
 

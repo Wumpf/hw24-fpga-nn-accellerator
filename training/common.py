@@ -15,7 +15,6 @@ def gen_gradient_image(w, h):
         image[x, :, 1] = np.linspace(0, 255, h)
     return image
 
-
 def quantize_array(values):
     d = 127.0
     values = np.clip(values, -1.0, 1.0)
@@ -26,9 +25,11 @@ def quantize_array(values):
 
 def write_array_to_memh_file(values, name, folder):
     with open(os.path.join(folder, f"{name}.txt"), "w") as f:
-        for m in values.flatten() * 127.0 + 127.0:
-            assert m >= 0
-            f.write(f"{int(m):0{2}x} ")
+        for m in values.flatten() * 127.0:
+            m = int(m)
+            m_signed_byte = struct.pack('b', m)
+            assert m_signed_byte >= struct.pack('b', 0)
+            f.write(f"{m_signed_byte.hex()} ")
 
 class NeuralNetwork(object):
     def __init__(self, img_width, img_height, layer_size, embedding_size, channels) -> None:
@@ -136,6 +137,9 @@ class NeuralNetwork(object):
         w_dict = {}
         for layer in self.__model.layers:
             w_dict[layer.name] = self.__model.get_layer(layer.name).get_weights()
+            # print(f"name: {layer.name}, weights.shape: {w_dict[layer.name][0].shape}, biases.shape: {w_dict[layer.name][1].shape}")
+            # print(f"first 2 elements ( {layer.name}.weights): {w_dict[layer.name][0][:2]}")
+            # print(f"first flattened 2 elements ( {layer.name}.weights): {w_dict[layer.name][0].flatten()[:2]}")
 
         quantized_params = {}
         for layer in w_dict.keys():
