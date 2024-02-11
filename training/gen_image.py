@@ -55,6 +55,37 @@ for i, a in enumerate(activations):
     print(f"min/max quantized activation_{i}: {np.min(qa)} / {np.max(qa)}, mean: {np.mean(qa)}, std: {np.std(qa)}")
     write_array_to_memh_file_2(
         quantize_array_2(a), f"activation_{i}", "output_with_eyes")
+    
+for activation_index, a in enumerate(activations[:-1]):
+    size = 64
+    if (activation_index == len(activations) - 2):
+        size = 32
+    array = a.reshape((64, 64, size))
+
+    normalized_array = 255 * (array - np.min(array)) / (np.max(array) - np.min(array))
+    normalized_array = normalized_array.astype(np.uint8)
+
+    # Create a blank 4096x4096 image
+    image = Image.new('L', (512, 512))
+
+    # Place each 64x64 slice in the 4096x4096 image
+    for i in range(size):  # For each slice        
+        # Extract the 64x64 slice
+        slice = normalized_array[:, :, i].reshape(64, 64)
+
+        # Convert slice to PIL image
+        slice_image = Image.fromarray(slice, 'L')
+        x = i % 8 * 64
+        y = i // 8 * 64
+        print(f"i: {i}, x: {x}, y: {y}")
+
+        # Calculate the position
+        position = (x, y)
+
+        # Paste the slice image into the main image
+        image.paste(slice_image, position)
+
+    rr.log(f"activation_{activation_index}", rr.Image(image))
 
 rr.log("last_activation", rr.Image((activations[-1] * 255).reshape((64, 64, 4)).astype(np.uint8)))
 rr.log("last_activation_quantized", rr.Image((quantize_array_2(activations[-1]) * 255).reshape((64, 64, 4)).astype(np.uint8)))
