@@ -44,7 +44,9 @@ class NeuralNetwork(object):
         self.__x_coords = np.arange(self.__img_width).reshape(-1, 1) / self.__img_width
         self.__y_coords = np.arange(self.__img_height).reshape(-1, 1) / self.__img_height
 
-        self.__encoded_pos = self.__encode_positions_interleaved_bits()
+        mx = 654
+        my = 57436
+        self.__encoded_pos = self.__encode_positions_bits(mx, my)
         #self.__encoded_pos = self.__encode_positions()
 
         self.__model = Sequential([
@@ -58,15 +60,15 @@ class NeuralNetwork(object):
     def encoded_pos(self):
         return self.__encoded_pos
     
-    def __encode_positions_interleaved_bits(self):
-        return np.array([self.__interleave_bits(x, y) for x in self.__x_coords for y in self.__y_coords])
+    def __encode_positions_bits(self, mx, my):
+        return np.array([self.__interleave_bits(x, y, mx, my) for x in self.__x_coords for y in self.__y_coords])
 
     def __float_to_binary(self, float_value):
         return format(struct.unpack('!I', struct.pack('!f', float_value))[0], '032b')
 
-    def __interleave_bits(self, x, y):
-        bin_x = self.__float_to_binary(x)
-        bin_y = self.__float_to_binary(y)
+    def __interleave_bits(self, x, y, mx, my):
+        bin_x = self.__float_to_binary(x * mx)
+        bin_y = self.__float_to_binary(y * my)
         
         return np.array([int(bit) for pair in (bin_x + bin_y) for bit in pair])
     
