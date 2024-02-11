@@ -84,16 +84,18 @@ module gemm_processor
         $readmemh("dense_biases.txt",    biases,    64*0,   64*1-1);
         $readmemh("dense_1_weights.txt", weights, 4096*1, 4096*2-1);
         $readmemh("dense_1_biases.txt",  biases,    64*1,   64*2-1);
-        $readmemh("dense_2_weights.txt", weights, 4096*2, 4096*3-1);
-        $readmemh("dense_2_biases.txt",  biases,    64*2,   64*3-1);
-        // $readmemh("dense_3_weights.txt", weights, 4096*3); // @TODO:
-        // $readmemh("dense_3_biases.txt",  biases, 64*3);
+        $readmemh("dense_2_weights.txt", weights, 2048*4, 2048*5-1);
+        $readmemh("dense_2_biases.txt",  biases,    32*4,   32*5-1);
+        $readmemh("dense_3_weights.txt", weights, 2048*5, 2048*5+64*4-1);
+        $readmemh("dense_3_biases.txt",  biases,    32*5,   32*5+   4-1);
         // $readmemh("activations.memh", activations);
 
         // $readmemh("dense_biases.txt",    activations,    64*0,   64*1-1);    
         // $readmemh("dense_biases.txt",    activations,    64*1,   64*2-1);    
         for (ii = 0; ii < NEURONS*2; ii = ii + 1)
-            activations[ii] = 1;//ii[7:0];
+            activations[ii] = 0;
+
+        $readmemh("encoded_pos.txt", activations, 0, 64);
 
         // {clear_accumulators, activations_in_addr, bias_addr, activations_out_addr}
         // 0th layer
