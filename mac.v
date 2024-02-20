@@ -203,7 +203,8 @@ module mac_grid(
                 mac_a[n] <= 0;
                 mac_b[n] <= 0;
             end
-        end else if (counter < 256) begin //  && time_counter == 12_000_000/30) begin
+        end else if (counter < 256) begin
+        // end else if (counter < 256 && time_counter == 12_000_000/30) begin
             time_counter <= 0;
             counter <= counter + MAC_COUNT;
 
@@ -212,6 +213,7 @@ module mac_grid(
                 mac_b[n] <= activations_memory[counter + n];
             end
         end else begin
+            time_counter <= time_counter + 1;
             for (n = 0; n < MAC_COUNT; n = n + 1) begin
                 mac_a[n] <= 0;
                 mac_b[n] <= 0;
@@ -228,7 +230,7 @@ endmodule
 `define VGA
 // `define DVI
 
-module top (
+module top(
     input CLK,
     input BTN1,
 
