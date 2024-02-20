@@ -60,21 +60,50 @@ module tb ();
         .progress(progress)
     );
 
-    // reg [15:0] activations [0:63];
-    wire [7:0] activations [0:127];
-    wire [7:0] accumulators [0:31];
+    // // reg [15:0] activations [0:63];
+    // wire [7:0] activations [0:127];
+    // wire [7:0] accumulators [0:31];
+    // reg [15:0] pc;
+    // reg [7:0] command;
+    // gemm_processor gemm_processor
+    // (
+    //     .clk(clk),
+    //     .reset(reset),
+    //     .activations_out(activations),
+    //     .accumulator_out(accumulators),
+    //     .progress(pc),
+    //     .command(command)
+    // );
+
+
+    genvar ii;
+
+    reg [128*8-1:0] activations;
+    wire [7:0] activations_as_array [0:128-1];
+    for (ii = 0; ii < 128; ii = ii + 1)
+        assign activations_as_array[ii] = activations[ii*8 +: 8];
+
+    wire [32*32-1:0] accumulators;
+    wire [31:0] accumulators_as_array [0:32-1];
+    for (ii = 0; ii < 32; ii = ii + 1)
+        assign accumulators_as_array[ii] = accumulators[ii*32 +: 32];
+
+    reg enable;
+    reg restart_program;
     reg [15:0] pc;
     reg [7:0] command;
-    gemm_processor gemm_processor
+    gemm_processor2 gemm_processor2
     (
         .clk(clk),
         .reset(reset),
+        .enable(enable),
+        .restart_program(restart_program),
+        .activations_in(activations),
         .activations_out(activations),
-        .accumulator_out(accumulators),
+        .accumulators(accumulators),
         .progress(pc),
         .command(command)
     );
-
 
 
 
