@@ -3,8 +3,11 @@ import shutil
 import struct
 import numpy as np
 
+import tensorflow as tf
 from keras.models import Sequential, Model
-from keras.layers import Dense
+from keras.layers import Dense, BatchNormalization, LayerNormalization, UnitNormalization, Lambda, ReLU, Activation
+from keras.optimizers import Adam, Nadam
+
 
 def gen_gradient_image(w, h):
     """Generate a gradient image of size w x h."""
@@ -32,12 +35,18 @@ def write_array_to_memh_file(values, name, folder):
             f.write(f"{m_signed_byte.hex()} ")
 
 class NeuralNetwork(object):
-    def __init__(self, img_width, img_height, layer_size, embedding_size, channels) -> None:
+    def __init__(self, img_width, img_height, layer_size, embedding_size, channels, learning_rate=1e-3, mixed_precision=None, normalization_type=None, activation_quantizer=None) -> None:
+
+        if mixed_precision != None:
+            # supported types: mixed_float16, mixed_bfloat16
+            tf.keras.mixed_precision.set_global_policy(mixed_precision)
+        # see also: https://www.tensorflow.org/api_docs/python/tf/keras/mixed_precision/LossScaleOptimizer
+        # see also: https://www.tensorflow.org/api_docs/python/tf/keras/constraints/MinMaxNorm
+
         self.__img_width = img_width
         self.__img_height = img_height
         self.__layer_size0 = layer_size
         self.__layer_size1 = layer_size
-        #self.__layer_size2 = int(layer_size / 4)
         self.__layer_size2 = layer_size // 2
         self.__embedding_size = embedding_size
         self.__channels = channels
@@ -47,16 +56,53 @@ class NeuralNetwork(object):
 
         mx = 654
         my = 57436
-        self.__encoded_pos = self.__encode_positions_bits(mx, my)
-        #self.__encoded_pos = self.__encode_positions()
+        # self.__encoded_pos = self.__encode_positions_bits(mx, my)
+        self.__encoded_pos = self.__encode_positions()
 
-        self.__model = Sequential([
-            Dense(self.__layer_size0, input_dim=embedding_size*2, activation='relu'),
-            Dense(self.__layer_size1, activation='relu'),
-            Dense(self.__layer_size2, activation='relu'),
-            Dense(self.__channels, activation='hard_sigmoid')
-        ])
-        self.__model.compile(optimizer='nadam', loss='mean_squared_error')
+        normalization = LayerNormalization if normalization_type == "Norm" else None
+        normalization = LayerNormalization if normalization_type == "LayerNorm" else normalization
+        normalization = BatchNormalization if normalization_type == "BatchNorm" else normalization
+        normalization = normalization_type if normalization_type != type(str) and normalization == None else normalization
+
+        activation = 'relu6'
+        last_activation = 'sigmoid'
+        # last_activation = 'hard_sigmoid'
+        # last_activation = 'relu6'
+
+        # hard sigmoid formula
+        # if x < -2.5: return 0
+        # if x > 2.5: return 1
+        # if -2.5 <= x <= 2.5: return 0.2 * x + 0.5
+
+        if activation_quantizer != None:
+            activation_with_quantization = lambda x: tf.keras.activations.relu(activation_quantizer(x))
+        else:
+            activation_with_quantization = activation
+        pre_activation_quantization = activation_quantizer
+
+        use_bias = False
+
+        if normalization == None:
+            self.__model = Sequential([
+                Dense(self.__layer_size0, use_bias=use_bias, activation=activation_with_quantization, input_dim=embedding_size*2),
+                Dense(self.__layer_size1, use_bias=use_bias, activation=activation_with_quantization),
+                Dense(self.__layer_size2, use_bias=use_bias, activation=activation_with_quantization),
+                Dense(self.__channels,    use_bias=use_bias, activation=pre_activation_quantization),
+                Activation(activation=last_activation)
+            ])
+        else:
+            self.__model = Sequential([
+                Dense(self.__layer_size0, use_bias=use_bias, activation=activation_with_quantization, input_dim=embedding_size*2),
+                normalization(),
+                Dense(self.__layer_size1, use_bias=use_bias, activation=activation_with_quantization),
+                normalization(),
+                Dense(self.__layer_size2, use_bias=use_bias, activation=activation_with_quantization),
+                normalization(),
+                Dense(self.__channels,    use_bias=use_bias, activation=pre_activation_quantization),
+                Activation(activation=last_activation)
+            ])
+        self.__model.compile(optimizer=Nadam(learning_rate=learning_rate), loss='mean_squared_error')
+        print(self.__model.optimizer.learning_rate.numpy())
     
     def encoded_pos(self):
         return self.__encoded_pos
@@ -85,15 +131,22 @@ class NeuralNetwork(object):
 
     def train(self, image, epochs=100, batch_size=32):
         Y = (np.array(image) / 255.0).reshape(-1, self.__channels)
-        return self.__model.fit(self.__encoded_pos, Y, epochs=epochs, batch_size=batch_size, verbose=True, validation_split=.1)  # Adjust epochs and batch size as needed
+        return self.__model.fit(self.__encoded_pos, Y, epochs=epochs, batch_size=batch_size, verbose=True)  # Adjust epochs and batch size as needed
 
-    def __load_ascii(self, folder, name):
+    # rr.set_time_sequence("step", step)
+    # rr.log("scalar", rr.Scalar(math.sin(step / 10.0)))
+
+    def __load_ascii(self, folder, name, verbose=False):
         with open(f"{folder}/{name}.txt", "r") as f:
             hex_values = f.read().strip().split(" ")
             floats = np.array(
                 [int.from_bytes(
                     int(value, 16).to_bytes(1, byteorder='little', signed=False), 'little', signed=True) for value in hex_values], dtype=np.float32)
+            if verbose:
+                print(floats)
             floats /= 128.0
+            if verbose:
+                print(floats)
             return floats
         
     def __load_ascii_reshape(self, folder, name, x, y):
@@ -103,7 +156,7 @@ class NeuralNetwork(object):
         layers = {
             "dense": (
                 self.__load_ascii_reshape(folder, "dense_weights", 64, self.__layer_size0),
-                self.__load_ascii(folder, "dense_biases"),
+                self.__load_ascii(folder, "dense_biases", verbose),
             ),
             "dense_1": (
                 self.__load_ascii_reshape(folder, "dense_1_weights", self.__layer_size0, self.__layer_size1),
@@ -118,8 +171,10 @@ class NeuralNetwork(object):
                 self.__load_ascii(folder, "dense_3_biases"),
             ),
         }
-        for layer, values in layers.items():
-            self.__model.get_layer(layer).set_weights(values)
+        for layer_name, values in layers.items():
+            # set only as many parameter tensors as layer requires, skips bias in Dense layer that were trained without them
+            layer = self.__model.get_layer(layer_name)
+            layer.set_weights(values[:len(layer.get_weights())])
 
     def predict(self):
         predicted_rgba = self.__model.predict(self.__encoded_pos) * 255  # Rescale the output
@@ -134,7 +189,11 @@ class NeuralNetwork(object):
     def __quantize_parameters(self):
         w_dict = {}
         for layer in self.__model.layers:
-            w_dict[layer.name] = self.__model.get_layer(layer.name).get_weights()
+            weights = self.__model.get_layer(layer.name).get_weights()
+            if len(weights) == 1:
+                w_dict[layer.name] = [weights[0], np.zeros(weights[0].shape[1])] # force biases to 0, if trained without them
+            elif len(weights) > 1:
+                w_dict[layer.name] = weights
             # print(f"name: {layer.name}, weights.shape: {w_dict[layer.name][0].shape}, biases.shape: {w_dict[layer.name][1].shape}")
             # print(f"first 2 elements ( {layer.name}.weights): {w_dict[layer.name][0][:2]}")
             # print(f"first flattened 2 elements ( {layer.name}.weights): {w_dict[layer.name][0].flatten()[:2]}")
@@ -162,6 +221,8 @@ class NeuralNetwork(object):
     
     def write_quantized_weights(self, folder):
         quantized_params = self.__quantize_parameters()
-        for layer, values in quantized_params.items():
-            self.__model.get_layer(layer).set_weights(values)
+        for layer_name, values in quantized_params.items():
+            # set only as many parameter tensors as layer requires, skips bias in Dense layer that were trained without them
+            layer = self.__model.get_layer(layer_name)
+            layer.set_weights(values[:len(layer.get_weights())])
         self.__write_weights(quantized_params, folder)
