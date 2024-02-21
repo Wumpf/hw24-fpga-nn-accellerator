@@ -728,8 +728,8 @@ async def test_net(dut):
     # print (act_3_s)
     # print (np.sum(np.abs(new_act_3 - act_3_s)))
 
-    print(np.min(act_3_s/127.0), np.max(act_3_s/127.0), np.mean(act_3_s/127.0), np.std(act_3_s/127.0))
-    print(np.min(new_act_3/127.0), np.max(new_act_3/127.0), np.mean(new_act_3/127.0), np.std(new_act_3/127.0))
+    print(f'expected quantized activations before sigmoid min: {np.min(act_3_s/127.0)}, max: {np.max(act_3_s/127.0)}, mean: {np.mean(act_3_s/127.0)}, std: {np.std(act_3_s/127.0)}')
+    print(f'         quantized activations before sigmoid min: {np.min(new_act_3/127.0)}, max: {np.max(new_act_3/127.0)}, mean: {np.mean(new_act_3/127.0)}, std: {np.std(new_act_3/127.0)}')
     outputs_hard = np.clip(0.5 + (new_act_3/CLAMP_MAX)*0.2, 0, 1)
     outputs_sigm = 1.0 / (1.0 + np.exp(-new_act_3/CLAMP_MAX))
 
