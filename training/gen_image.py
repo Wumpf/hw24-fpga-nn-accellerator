@@ -3,26 +3,48 @@ import rerun as rr
 import struct
 
 import numpy as np
+import tensorflow as tf
 
 from PIL import Image
 
 from common import NeuralNetwork, quantize_array, write_array_to_memh_file
 
+CLIP_MAX = 4.0
+
 def quantize_array_2(values):
-    d = 255.0/8.0
-    values = np.clip(values, 0.0, 8.0)
+    return quantize_array(values)
+    # d = 255.0
+    # values = np.clip(values, 0.0, CLIP_MAX)
+    # values *= d
+    # values = np.floor(values)
+    # values /= d
+    # return values
+
+def quantize_array_tf(values):
+    d = 127.0/CLIP_MAX
+    values = tf.clip_by_value(values, -CLIP_MAX, CLIP_MAX)
     values *= d
-    values = np.floor(values)
+    values = tf.floor(values)
     values /= d
     return values
 
+def quantize_array_2_tf(values):
+    return quantize_array_tf(values)
+    # d = 255.0
+    # values = tf.clip_by_value(values, 0.0, CLIP_MAX)
+    # values *= d
+    # values = tf.floor(values)
+    # values /= d
+    # return values
+
 def write_array_to_memh_file_2(values, name, folder):
-    with open(os.path.join(folder, f"{name}.txt"), "w") as f:
-        for m in values.flatten() * (255.0/8.0):
-            m = int(m)
-            m_signed_byte = struct.pack('B', m)
-            assert m_signed_byte >= struct.pack('B', 0)
-            f.write(f"{m_signed_byte.hex()} ")
+    return write_array_to_memh_file(values, name, folder)
+    # with open(os.path.join(folder, f"{name}.txt"), "w") as f:
+    #     for m in values.flatten() * (255.0/CLIP_MAX):
+    #         m = int(m)
+    #         m_signed_byte = struct.pack('B', m)
+    #         assert m_signed_byte >= struct.pack('B', 0)
+    #         f.write(f"{m_signed_byte.hex()} ")
 
 rr.init("test_ascii", spawn=True)
 
@@ -37,7 +59,8 @@ width, height = 64, 64
 embedding_size = 32
 layer_size = 64
 
-nn = NeuralNetwork(width, height, layer_size, embedding_size, channels)
+nn = NeuralNetwork(width, height, layer_size, embedding_size, channels, activation_quantizer=quantize_array_2_tf)
+# nn = NeuralNetwork(width, height, layer_size, embedding_size, channels, normalization_type="LayerNorm")
 
 nn.load_weights_from_folder("output_with_eyes")
 predicted_rgb = nn.predict()
@@ -57,9 +80,7 @@ for i, a in enumerate(activations):
         quantize_array_2(a), f"activation_{i}", "output_with_eyes")
     
 for activation_index, a in enumerate(activations[:-1]):
-    size = 64
-    if (activation_index == len(activations) - 2):
-        size = 32
+    size = a.shape[-1]
     array = a.reshape((64, 64, size))
 
     normalized_array = 255 * (array - np.min(array)) / (np.max(array) - np.min(array))
@@ -77,7 +98,7 @@ for activation_index, a in enumerate(activations[:-1]):
         slice_image = Image.fromarray(slice, 'L')
         x = i % 8 * 64
         y = i // 8 * 64
-        print(f"i: {i}, x: {x}, y: {y}")
+        # print(f"i: {i}, x: {x}, y: {y}")
 
         # Calculate the position
         position = (x, y)
@@ -100,7 +121,7 @@ def quantize_array_12_bits(values):
     return quantize_array_2(skipped_values)
 
 a = activations[-1]
-write_array_to_memh_file_2(quantize_array_12_bits(a), f"activation_{i}_12bits", "output_with_eyes")
+write_array_to_memh_file_2(quantize_array_12_bits(a), f"activation_{len(activations)-1}_12bits", "output_with_eyes")
 
 rr.log("last_activation", rr.Image((activations[-1] * 255).reshape((64, 64, 4)).astype(np.uint8)))
 rr.log("last_activation_quantized", rr.Image((quantize_array_2(activations[-1]) * 255).reshape((64, 64, 4)).astype(np.uint8)))
