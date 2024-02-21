@@ -251,16 +251,18 @@ module gemm_processor2
         //         weights    [ii*64+jj] = y;
         //         weights    [jj*64+ii] = x;
         //     end
-        $display(weights[0], " ", weights[1], " ", weights[2], " ", weights[3], " ... ", weights[63]);
-        $display(weights[64], " ", weights[65], " ", weights[66], " ", weights[67], " ... ", weights[127]);
-        $display(weights[128], " ", weights[129], " ", weights[130], " ", weights[131], " ... ", weights[191]);
-        $display(weights[192], " ", weights[193], " ", weights[194], " ", weights[195], " ... ", weights[255]);
-        $display("...");
-        $display(weights[4032-192], " ", weights[4033-192], " ", weights[4034-192], " ", weights[4035-192], " ... ", weights[4095-192]);
-        $display(weights[4032-128], " ", weights[4033-128], " ", weights[4034-128], " ", weights[4035-128], " ... ", weights[4095-128]);
-        $display(weights[4032-64], " ", weights[4033-64], " ", weights[4034-64], " ", weights[4035-64], " ... ", weights[4095-64]);
-        $display(weights[4032], " ", weights[4033], " ", weights[4034], " ", weights[4035], " ... ", weights[4095]);
-        $display(weights[4096]);
+
+        // display weight values for testing
+        // $display(weights[0], " ", weights[1], " ", weights[2], " ", weights[3], " ... ", weights[63]);
+        // $display(weights[64], " ", weights[65], " ", weights[66], " ", weights[67], " ... ", weights[127]);
+        // $display(weights[128], " ", weights[129], " ", weights[130], " ", weights[131], " ... ", weights[191]);
+        // $display(weights[192], " ", weights[193], " ", weights[194], " ", weights[195], " ... ", weights[255]);
+        // $display("...");
+        // $display(weights[4032-192], " ", weights[4033-192], " ", weights[4034-192], " ", weights[4035-192], " ... ", weights[4095-192]);
+        // $display(weights[4032-128], " ", weights[4033-128], " ", weights[4034-128], " ", weights[4035-128], " ... ", weights[4095-128]);
+        // $display(weights[4032-64], " ", weights[4033-64], " ", weights[4034-64], " ", weights[4035-64], " ... ", weights[4095-64]);
+        // $display(weights[4032], " ", weights[4033], " ", weights[4034], " ", weights[4035], " ... ", weights[4095]);
+        // $display(weights[4096]);
 
         // 01234567 =transpose=> 02461357                   0123456789abcdef =transpose=> 02468ace13579bdf
         // 0.12.34.56.7 -> 0.21.43.65.7                     0.12.34.56.78.9a.bc.de.f -> 0.21.43.65.87.a9.cb.ed.f
@@ -272,8 +274,8 @@ module gemm_processor2
         //                                                  02468ac.1e.3579bdf       -> 02468ac.e1.3579bdf
         //                                                  02468ace13579bdf
 
+        // transpose layer 0 (64,64) -> (128, 32)
         for (nn = 1; nn < 128/2; nn = nn + 1) begin
-            // $display(nn*32, (128-nn)*32, (128-nn)*32-nn*32);
             for (ii = nn*32; ii < (128-nn)*32; ii = ii + 64) begin
                 for (jj = ii; jj < ii + 32; jj = jj + 1) begin
                     x = weights[jj   ];
@@ -284,20 +286,8 @@ module gemm_processor2
             end
         end
 
-        $display(weights[0], " ", weights[1], " ", weights[2], " ", weights[3], " ... ", weights[31]);
-        $display(weights[32+0], " ", weights[32+1], " ", weights[32+2], " ", weights[32+3], " ... ", weights[32+31]);
-        $display(weights[64+0], " ", weights[64+1], " ", weights[64+2], " ", weights[64+3], " ... ", weights[64+31]);
-        $display(weights[96+0], " ", weights[96+1], " ", weights[96+2], " ", weights[96+3], " ... ", weights[96+31]);
-        $display("...");
-        $display(weights[4064-96], " ", weights[4065-96], " ", weights[4066-96], " ", weights[4067-96], " ... ", weights[4095-96]);
-        $display(weights[4064-64], " ", weights[4065-64], " ", weights[4066-64], " ", weights[4067-64], " ... ", weights[4095-64]);
-        $display(weights[4064-32], " ", weights[4065-32], " ", weights[4066-32], " ", weights[4067-32], " ... ", weights[4095-32]);
-        $display(weights[4064], " ", weights[4065], " ", weights[4066], " ", weights[4067], " ... ", weights[4095]);
-        $display(weights[4096]);
-
-
+        // transpose layer 1 (64,64) -> (128, 32)
         for (nn = 1; nn < 128/2; nn = nn + 1) begin
-            // $display(nn*32, (128-nn)*32, (128-nn)*32-nn*32);
             for (ii = nn*32; ii < (128-nn)*32; ii = ii + 64) begin
                 for (jj = ii; jj < ii + 32; jj = jj + 1) begin
                     x = weights[4096*1 + jj   ];
@@ -308,6 +298,8 @@ module gemm_processor2
             end
         end
 
+
+        // pad layer 3 with zeroes (32,4) -> (32,32)
         for (ii = 31; ii >= 0; ii = ii - 1)
             for (jj = 0; jj < 32; jj = jj + 1) begin
                 if (jj < 4)
@@ -316,10 +308,22 @@ module gemm_processor2
                     weights[2048*5+ii*32+jj] = 0;
             end
 
-        for (ii = 0; ii < 32; ii = ii + 1) begin
-            nn = 2048*5+ii*32;
-            $display(weights[nn+0], " ", weights[nn+1], " ", weights[nn+2], " ", weights[nn+3], " ... ", weights[nn+30], weights[nn+31]);
-        end
+        // display weight values for testing
+        //
+        // $display(weights[0], " ", weights[1], " ", weights[2], " ", weights[3], " ... ", weights[31]);
+        // $display(weights[32+0], " ", weights[32+1], " ", weights[32+2], " ", weights[32+3], " ... ", weights[32+31]);
+        // $display(weights[64+0], " ", weights[64+1], " ", weights[64+2], " ", weights[64+3], " ... ", weights[64+31]);
+        // $display(weights[96+0], " ", weights[96+1], " ", weights[96+2], " ", weights[96+3], " ... ", weights[96+31]);
+        // $display("...");
+        // $display(weights[4064-96], " ", weights[4065-96], " ", weights[4066-96], " ", weights[4067-96], " ... ", weights[4095-96]);
+        // $display(weights[4064-64], " ", weights[4065-64], " ", weights[4066-64], " ", weights[4067-64], " ... ", weights[4095-64]);
+        // $display(weights[4064-32], " ", weights[4065-32], " ", weights[4066-32], " ", weights[4067-32], " ... ", weights[4095-32]);
+        // $display(weights[4064], " ", weights[4065], " ", weights[4066], " ", weights[4067], " ... ", weights[4095]);
+        // $display(weights[4096]);
+        // for (ii = 0; ii < 32; ii = ii + 1) begin
+        //     nn = 2048*5+ii*32;
+        //     $display(weights[nn+0], " ", weights[nn+1], " ", weights[nn+2], " ", weights[nn+3], " ... ", weights[nn+30], weights[nn+31]);
+        // end
 
 
         // {clear_accumulators, activations_in_addr, bias_addr, activations_out_addr} 
@@ -372,7 +376,7 @@ module gemm_processor2
             (
                 .clk(clk),
                 .reset(reset),
-                .enable(enable), //&& !read_hazard),
+                .enable(enable),
                 .clear_accumulator(clear_accumulators_in_sync_with_mac_input),
                 .a(mac_a[i]),
                 .b(mac_b_shared),
@@ -420,7 +424,7 @@ module gemm_processor2
             clear_accumulators_in_sync_with_mac_input <= 1;
             activations_out_addr_in_sync_with_mac_output[0] <= -1;
             activations_out_addr_in_sync_with_mac_output[1] <= -1;
-        end else if (enable) begin // && !read_hazard) begin
+        end else if (enable) begin
             clear_accumulators_in_sync_with_mac_input <= clear_accumulators;
             activations_out_addr_in_sync_with_mac_output[1] <= activations_out_addr;
             activations_out_addr_in_sync_with_mac_output[0] <= activations_out_addr_in_sync_with_mac_output[1];
@@ -433,6 +437,7 @@ module gemm_processor2
             end
 
             if (!read_hazard) begin
+                // @TODO: weight_addr derived directly from pc
                 if (weight_addr < WEIGHTS - 32)
                     weight_addr <= weight_addr + 32;
                 pc <= pc + 1;
