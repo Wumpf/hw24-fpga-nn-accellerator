@@ -6,7 +6,7 @@ SIM ?= icarus
 TOPLEVEL_LANG ?= verilog
 
 # this is the only part you should need to modify:
-VERILOG_SOURCES += $(PWD)/tb.v $(PWD)/blinky.v $(PWD)/mac.v $(PWD)/gemm.v
+VERILOG_SOURCES += $(PWD)/tb.v $(PWD)/blinky.v $(PWD)/mac.v $(PWD)/gemm2.v
 
 # TOPLEVEL is the name of the toplevel module in your Verilog or VHDL file
 TOPLEVEL = tb

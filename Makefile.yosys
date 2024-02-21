@@ -1,4 +1,6 @@
-TOP = mac
+#TOP = mac
+#TOP = video
+TOP = gemm
 
 all: $(TOP).rpt $(TOP).bin
 
