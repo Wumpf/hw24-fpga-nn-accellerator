@@ -40,6 +40,7 @@ class NeuralNetwork(object):
         if mixed_precision != None:
             # supported types: mixed_float16, mixed_bfloat16
             tf.keras.mixed_precision.set_global_policy(mixed_precision)
+        tf.keras.mixed_precision.set_global_policy("mixed_float16")
         # see also: https://www.tensorflow.org/api_docs/python/tf/keras/mixed_precision/LossScaleOptimizer
         # see also: https://www.tensorflow.org/api_docs/python/tf/keras/constraints/MinMaxNorm
 
@@ -57,7 +58,20 @@ class NeuralNetwork(object):
         mx = 654
         my = 57436
         # self.__encoded_pos = self.__encode_positions_bits(mx, my)
-        self.__encoded_pos = self.__encode_positions()
+        # self.__encoded_pos = self.__encode_positions_bitswap()
+        # self.__encoded_pos = self.__encode_positions_sincos()
+        # self.__encoded_pos = self.__encode_positions_sincos2()
+        # self.__encoded_pos = self.__encode_positions_tri()
+        # self.__encoded_pos, self.__encoding_matrix = self.__encode_positions_sawtooth()
+        self.__encoded_pos, self.__encoding_matrix = self.__encode_positions_sawtooth_fixed()
+
+        # print (self.__encoded_pos.shape)
+        # self.__encoded_pos = np.array([[x[0],y[0]] for x in self.__x_coords for y in self.__y_coords])#.reshape((64, 2))
+        # print (self.__encoded_pos.shape)
+
+        print (f'envoded pos min: {np.min(self.__encoded_pos)}, max: {np.max(self.__encoded_pos)}, mean: {np.mean(self.__encoded_pos)}, std: {np.std(self.__encoded_pos)}')
+        # print (self.__encoded_pos[0:64])
+        # print (self.__encoded_pos[0:128]*127)
 
         normalization = LayerNormalization if normalization_type == "Norm" else None
         normalization = LayerNormalization if normalization_type == "LayerNorm" else normalization
@@ -82,8 +96,18 @@ class NeuralNetwork(object):
 
         use_bias = False
 
+        # seed = 127
+        # np.random.seed(seed)
+        # self.__rnd = np.random.random_integers(0, 127, self.__embedding_size*4)
+        # assert np.all(self.__encoding_matrix == self.__rnd)
+        # print (self.__rnd)
+
         if normalization == None:
             self.__model = Sequential([
+                # Dense(self.__embedding_size*2, use_bias=use_bias, input_dim=2, kernel_initializer=initializers.Zeros()), # initializers.RandomNormal(mean=.5, stddev=.5*.5)),
+                # Activation(activation=lambda x: tf.sin(x*3.14)),
+                # Dense(self.__layer_size0, use_bias=use_bias, activation=activation_with_quantization),
+
                 Dense(self.__layer_size0, use_bias=use_bias, activation=activation_with_quantization, input_dim=embedding_size*2),
                 Dense(self.__layer_size1, use_bias=use_bias, activation=activation_with_quantization),
                 Dense(self.__layer_size2, use_bias=use_bias, activation=activation_with_quantization),
@@ -101,6 +125,8 @@ class NeuralNetwork(object):
                 Dense(self.__channels,    use_bias=use_bias, activation=pre_activation_quantization),
                 Activation(activation=last_activation)
             ])
+        # layer = self.__model.get_layer("dense").set_weights([(self.__rnd.astype(float)).reshape((2,64))])
+
         self.__model.compile(optimizer=Nadam(learning_rate=learning_rate), loss='mean_squared_error')
         print(self.__model.optimizer.learning_rate.numpy())
     
@@ -119,15 +145,95 @@ class NeuralNetwork(object):
         
         return np.array([int(bit) for pair in (bin_x + bin_y) for bit in pair])
     
-    def __encode_positions(self):
+    def __encode_positions(self, periodic_fnA=np.sin, periodic_fnB=np.cos, random_range=(0, 0xFFFFFF), entangled=True):
         seed = 127
         np.random.seed(seed)
-        rnd = np.random.random_integers(0, 0xFFFFFF, self.__embedding_size)
+        rnd = np.random.random_integers(random_range[0], random_range[1], self.__embedding_size)
         return np.array([
             np.array([
-                [np.sin(x * rnd[i] + y), np.cos(y * rnd[self.__embedding_size-1-i] + x)]
+                [periodic_fnA(x * rnd[i] + y), periodic_fnB(y * rnd[self.__embedding_size-1-i] + x)] if entangled else
+                [periodic_fnA(x * rnd[i]), periodic_fnB(y * rnd[self.__embedding_size-1-i])]
                     for i in range(self.__embedding_size)]).flatten()
                         for x in self.__x_coords for y in self.__y_coords])
+
+    def __encode_positions_sincos2(self, periodic_fnA=np.sin, periodic_fnB=np.cos, random_range=(0, 0xFFFFFF), entangled=True):
+        seed = 127
+        np.random.seed(seed)
+        rnd = np.random.random_integers(random_range[0], random_range[1], self.__embedding_size*4)
+        return np.array([
+            np.array([
+                [periodic_fnA(x * rnd[i*4+0] + y * rnd[i*4+1]),
+                 periodic_fnB(y * rnd[i*4+2] + x * rnd[i*4+3])]
+                    for i in range(self.__embedding_size)]).flatten()
+                        for x in self.__x_coords for y in self.__y_coords])
+
+    def __encode_positions_sincos(self, entangled=True):
+        return self.__encode_positions(np.sin, np.cos, entangled=entangled)
+
+    def __encode_positions_sawtooth(self, entangled=True):
+        periodic_fn = lambda x : np.modf(x)[0]*2-1 if int(np.modf(x)[1]) % 1 == 0 else (1-np.modf(x)[0])*2-1
+
+        seed = 127
+        np.random.seed(seed)
+        rnd = np.random.random_integers(0, 127, self.__embedding_size*4)
+        return np.array([
+            np.array([
+                [periodic_fn(x * rnd[i*4+0] + y * rnd[i*4+1]),
+                 periodic_fn(x * rnd[i*4+2] + y * rnd[i*4+3])]
+                    for i in range(self.__embedding_size)]).flatten()
+                        for x in self.__x_coords for y in self.__y_coords]), rnd
+
+    def __encode_positions_sawtooth_fixed(self):
+        def toSigned8(n):
+            n = n & 0xff
+            return n | (-(n & 0x80))
+
+        periodic_fn = lambda x : toSigned8(x&0xFF if (x&0x100) == 0 else 0xFF-(x&0xFF)) / 127.0
+
+        seed = 127
+        np.random.seed(seed)
+        rnd = np.random.random_integers(0, 127, self.__embedding_size*4)
+        return np.array([
+            [periodic_fn(int(x*128) * rnd[i*2+0] + int(y*128) * rnd[i*2+1]) for i in range(self.__embedding_size*2)]
+                for x in self.__x_coords for y in self.__y_coords]), rnd
+
+
+    def __encode_positions_tri(self, entangled=True):
+        periodic_fn = lambda x : np.modf(x)[0]*2-1
+        return self.__encode_positions(periodic_fn, periodic_fn, entangled=entangled)
+
+    def __encode_positions_bitswap(self, random_range=(0, 255)):
+        def bitswap(x, y, rnd):
+            # print (x, y, rnd)
+            # src_bits = \
+            #     format(struct.unpack('!B', struct.pack('b',    x+y))[0], '06b') + \
+            #     format(struct.unpack('!B', struct.pack('b',    x-y))[0], '06b') + \
+            #     format(struct.unpack('!B', struct.pack('b', 64-x+y))[0], '06b') + \
+            #     format(struct.unpack('!B', struct.pack('b', 64-x-y))[0], '06b')
+            src_bits = \
+                format(struct.unpack('!B', struct.pack('b',    x))[0], '06b') + \
+                format(struct.unpack('!B', struct.pack('b',    y))[0], '06b') + \
+                format(struct.unpack('!B', struct.pack('b', 64-x))[0], '06b') + \
+                format(struct.unpack('!B', struct.pack('b', 64-y))[0], '06b')
+            bits = [src_bits[i%len(src_bits)] for i in rnd]
+            # print (''.join(src_bits), ''.join(bits))
+            # print (bits, ''.join(bits))
+            return int(''.join(bits), 2)/128-1.0
+
+        # print(self.__x_coords.shape)
+        # print(self.__x_coords)
+
+        seed = 127
+        np.random.seed(seed)
+        rnd = np.random.random_integers(random_range[0], random_range[1], self.__embedding_size * 16)
+        return np.array([
+            np.array([
+                # [bitswap(int(x*64), int(y*64), rnd[(i+0)*8 : (i+1)*8]),
+                #  bitswap(int(x*64), int(y*64), rnd[(i+2)*8 : (i+3)*8])]
+                [bitswap(int(x*64), int(y*64), np.cumsum([rnd[i]]*8)),
+                 bitswap(int(y*64), int(x*64), np.cumsum([rnd[self.__embedding_size-1-i]]* 8))]
+                    for i in range(self.__embedding_size)]).flatten()
+                        for x in self.__x_coords.flatten() for y in self.__y_coords.flatten()])
 
     def train(self, image, epochs=100, batch_size=32):
         Y = (np.array(image) / 255.0).reshape(-1, self.__channels)
@@ -156,7 +262,7 @@ class NeuralNetwork(object):
         layers = {
             "dense": (
                 self.__load_ascii_reshape(folder, "dense_weights", 64, self.__layer_size0),
-                self.__load_ascii(folder, "dense_biases", verbose),
+                self.__load_ascii(folder, "dense_biases"),
             ),
             "dense_1": (
                 self.__load_ascii_reshape(folder, "dense_1_weights", self.__layer_size0, self.__layer_size1),

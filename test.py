@@ -686,6 +686,80 @@ async def gemm_processor_test_array_of_inputs(dut):
                 assert np.all(new_act_3[n][0:3] == [n.integer for n in dut.activations_as_array.value[0:3]])
 
 @cocotb.test()
+async def test_pos_encoding(dut):
+    inputs    = load_hex('encoded_pos.txt')
+    inputs_s  = np.vectorize(toSigned8)(inputs)
+
+    embedding_size = 32
+    seed = 127
+    np.random.seed(seed)
+    rnd = np.random.random_integers(0, 127, embedding_size*4)
+    # print (rnd)
+
+    def encode_positions_sawtooth(rnd, embedding_size, x_coords, y_coords):
+        # periodic_fn = lambda x : np.modf(x)[0]*2-1 if int(np.modf(x)[1]) % 1 == 0 else (1-np.modf(x)[0])*2-1
+        # return np.array([
+        #     [periodic_fn(x * rnd[i*2+0] + y * rnd[i*2+1]) for i in range(embedding_size*2)]
+        #         for x in x_coords for y in y_coords])
+
+        periodic_fn = lambda x : toSigned8(x&0xFF if (x&0x100) == 0 else 0xFF-(x&0xFF)) / 127.0
+        return np.array([
+            [periodic_fn(int(x*128) * rnd[i*2+0] + int(y*128) * rnd[i*2+1]) for i in range(embedding_size*2)]
+                for x in x_coords for y in y_coords])
+
+    def quantize_array(values):
+        d = 127.0
+        values = np.clip(values, -1.0, 1.0)
+        values *= d
+        values = np.floor(values)
+        values /= d
+        return values
+
+    xs = np.arange(64) / 64
+    ys = np.arange(64) / 64
+    new_pos_encoding = encode_positions_sawtooth(rnd, embedding_size, xs, ys)
+    new_pos_encoding = quantize_array(new_pos_encoding)
+    new_pos_encoding = (new_pos_encoding * 127.0).astype(int).flatten()
+
+    assert new_pos_encoding.shape == inputs_s.shape
+    for n in range(len(inputs_s)):
+        if inputs_s[n] != new_pos_encoding[n]:
+            print(n, inputs_s[n], new_pos_encoding[n])
+            break
+    assert np.all(new_pos_encoding == inputs_s)
+
+@cocotb.test()
+async def test_pos_encoding_fixed_point(dut):
+    inputs    = np.array(load_hex('encoded_pos.txt'))
+
+    embedding_size = 32
+    seed = 127
+    np.random.seed(seed)
+    rnd = np.random.random_integers(0, 127, embedding_size*4)
+    # print (rnd)
+
+    def encode_positions_sawtooth_fixed(rnd, embedding_size, x_coords, y_coords):
+        periodic_fn = lambda x : x&0xFF if (x&0x100) == 0 else 0xFF-(x&0xFF)
+
+        return np.array([
+            [periodic_fn(x * rnd[i*2+0] + y * rnd[i*2+1]) for i in range(embedding_size*2)]
+                for x in x_coords for y in y_coords])
+
+    xs = np.arange(64)*2 # 0..128
+    ys = np.arange(64)*2 # 0..128
+    new_pos_encoding = encode_positions_sawtooth_fixed(rnd, embedding_size, xs, ys).flatten()
+    new_pos_encoding[new_pos_encoding == 128] = 129
+    print (inputs[0:128])
+    print (new_pos_encoding[0:128])
+    for n in range(len(inputs)):
+        if inputs[n] != new_pos_encoding[n]:
+            print(n, inputs[n], new_pos_encoding[n])
+            break
+    assert new_pos_encoding.shape == inputs.shape
+    assert np.all(new_pos_encoding == inputs)
+
+
+@cocotb.test()
 async def test_net(dut):
     verbose = True
     weights_0 = load_hex('dense_weights.txt')
