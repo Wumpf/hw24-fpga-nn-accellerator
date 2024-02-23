@@ -125,3 +125,6 @@ write_array_to_memh_file_2(quantize_array_12_bits(a), f"activation_{len(activati
 
 rr.log("last_activation", rr.Image((activations[-1] * 255).reshape((64, 64, 4)).astype(np.uint8)))
 rr.log("last_activation_quantized", rr.Image((quantize_array_2(activations[-1]) * 255).reshape((64, 64, 4)).astype(np.uint8)))
+rr.log("last_activation_quantized_12bpp", rr.Image((quantize_array_2(activations[-1]) * 255).reshape((64, 64, 4)).astype(np.uint8) & 0xF0))
+
+

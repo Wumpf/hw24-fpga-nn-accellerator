@@ -816,5 +816,8 @@ async def test_net(dut):
     image = Image.fromarray((outputs_sigm.reshape((64, 64, 4))*255).astype(np.uint8), 'RGBA')
     image.save("output_sigmoid.png")
 
+    image = Image.fromarray((outputs_sigm.reshape((64, 64, 4))*255).astype(np.uint8) & 0xF0, 'RGBA')
+    image.save("output_sigmoid_12bpp.png")
+
     image = Image.fromarray((act_4_s.reshape((64, 64, 4))*2).astype(np.uint8), 'RGBA')
     image.save("output_o.png")
